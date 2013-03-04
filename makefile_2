@@ -1,0 +1,11 @@
+main: main.o fonctions.o
+	g++ -O2 -Wall main.o fonctions.o `pkg-config --libs opencv` -o ./bin/exec
+	
+main.o: main.cpp ./include/fonctions.h
+	g++ -O2 -Wall main.cpp `pkg-config --cflags opencv` -c
+	
+fonctions.o: ./src/fonctions.cpp
+	g++ -O2 -Wall ./src/fonctions.cpp `pkg-config --cflags opencv` -c 
+
+clean:
+	rm *.o ./bin/exec
