@@ -1,4 +1,4 @@
 all:
-	g++ -O2 -Wall -o exemple ex_opencv.cpp `pkg-config --cflags --libs opencv`
+	g++ -O2 -Wall -o exec main.cpp `pkg-config --cflags --libs opencv`
 clean:
-	rm -rf exemple
+	rm -rf exec
