@@ -270,6 +270,219 @@ void ecriture_fichier_histogramme(double ** tableau, int hauteur_img, int largeu
         printf("Impossible d'ouvrir le fichier");
     }
 }
+
+int cherche_i_min(int** tableau_coordonnees, int taille_tableau)
+{
+	int i_min = tableau_coordonnees[0][0];
+	
+	for(int k=0;k<taille_tableau;k++){
+		if (tableau_coordonnees[k][0] < i_min)
+			i_min = tableau_coordonnees[k][0];
+	}
+	
+	return i_min;
+}
+
+int cherche_i_max(int** tableau_coordonnees, int taille_tableau)
+{
+	int i_max = 0;
+	for(int k=0;k<taille_tableau;k++){
+		if (tableau_coordonnees[k][0] > i_max)
+			i_max = tableau_coordonnees[k][0];
+	}
+	
+	return i_max;
+}	
+
+int cherche_j_min(int** tableau_coordonnees, int taille_tableau)
+{
+	int j_min = tableau_coordonnees[0][1];
+	
+	for(int k=0;k<taille_tableau;k++){
+		if (tableau_coordonnees[k][1] < j_min)
+			j_min = tableau_coordonnees[k][1];
+	}
+	
+	return j_min;
+}
+
+int cherche_j_max(int** tableau_coordonnees, int taille_tableau)
+{
+	int j_max = 0;
+	for(int k=0;k<taille_tableau;k++){
+		if (tableau_coordonnees[k][1] > j_max)
+			j_max = tableau_coordonnees[k][1];
+	}
+	
+	return j_max;
+}		
+
+void histo_reponses_i(int** tableau, int taille_tableau, int* histo_i, int taille_histo_i)
+{
+	int i_min = cherche_i_min(tableau,taille_tableau);
+	
+	for (int k = 0 ; k < taille_tableau ; k++){
+		int indice_i = tableau[k][0] - i_min;
+		histo_i[indice_i] += 1;
+	}
+	
+	FILE* fichier_i = NULL;
+	fichier_i = fopen("histo_ordonnees.txt", "w+");
+	
+	for (int k=0; k < taille_histo_i ; k++)
+		fprintf(fichier_i,"%d\t%d\n",i_min+k,histo_i[k]);
+	
+	fclose(fichier_i);
+	
+	return;
+}
+
+void histo_reponses_j(int** tableau, int taille_tableau, int* histo_j, int taille_histo_j,int ordonnee_min,int ordonnee_max)
+{
+	int j_min = cherche_j_min(tableau,taille_tableau);
+	
+	for (int k = 0 ; k < taille_tableau ; k++){
+		if ((tableau[k][0]>ordonnee_min) && (tableau[k][0]<ordonnee_max)){
+			int indice_j = tableau[k][1] - j_min;
+			histo_j[indice_j] += 1;
+		}
+	}
+	
+	FILE* fichier_j = NULL;
+	fichier_j = fopen("histo_abscisses2.txt", "w+");
+	
+	for (int k=0; k < taille_histo_j ; k++)
+		fprintf(fichier_j,"%d\t%d\n",j_min+k,histo_j[k]);
+	
+	fclose(fichier_j);
+	
+	return;
+}
+/*
+void classe_i(int* histo_i, int taille_histo_i, int** tableau_classe_i, int taille_tableau_classe_i, int nb_entrees_tableau_classe_i, int i_min)
+{
+	int a =0;
+	int ind = 0;
+	
+	for(int k=0; k<taille_histo_i-4; k++){
+		if (histo_i[k]!=0){
+			tableau_classe_i[a][ind]=k+i_min;
+			ind=ind+1;
+		}
+		if ((histo_i[k]!=0) && (histo_i[k+1]==0) && (histo_i[k+2]==0) && (histo_i[k+3]==0)){
+			a=a+1;
+			ind=0;
+		}
+	}
+	
+	for (int k=taille_histo_i-5;k<taille_histo_i;k++){
+		if (histo_i[k]!=0){
+			tableau_classe_i[a][ind]=k+i_min;
+			ind=ind+1;
+		}
+	}
+	
+	FILE* fichier_classe_i = NULL;
+	fichier_classe_i = fopen("histo_ordonnees_classees.txt", "w+");
+	
+	for (int a=0; a<taille_tableau_classe_i ; a++){
+		for (int ind=0; ind<nb_entrees_tableau_classe_i;ind++){
+			fprintf(fichier_classe_i,"%d\t%d\n",a,tableau_classe_i[a][ind]);
+		}
+	}
+	
+	fclose(fichier_classe_i); 
+	
+	return;
+}
+* */
+
+void classe_i_max(int* histo_i, int taille_histo_i, int* tableau_classe_i, int taille_tableau_classe_i, int i_min)
+{
+	int classe_actuelle = 0;
+	int nb_zero_de_suite = 0;
+	int trouve_autre_chose_que_zero = 0;
+	
+	for (int k=0; k < taille_histo_i; k++){
+		if (histo_i[k] != 0){
+			trouve_autre_chose_que_zero =1;
+			nb_zero_de_suite = 0;			
+		}
+		if ((trouve_autre_chose_que_zero ==1 ) && (histo_i[k] == 0 )){
+			nb_zero_de_suite = nb_zero_de_suite + 1;
+		}
+		
+		if ((nb_zero_de_suite > 2) && (trouve_autre_chose_que_zero == 1)){
+			tableau_classe_i[classe_actuelle]=i_min+k;
+			classe_actuelle=classe_actuelle+1;
+			nb_zero_de_suite=0;
+			trouve_autre_chose_que_zero = 0;
+		}
+		if (k == taille_histo_i -1){
+			tableau_classe_i[classe_actuelle]=i_min+k;
+		}
+	}
+	
+	FILE* fichier_classe_i = NULL;
+	fichier_classe_i = fopen("histo_ordonnees_classees2.txt", "w+");
+	
+	for (int classe_actuelle=0; classe_actuelle<taille_tableau_classe_i ; classe_actuelle++){
+		fprintf(fichier_classe_i,"%d\t%d\n",classe_actuelle,tableau_classe_i[classe_actuelle]);
+	}
+	
+	fclose(fichier_classe_i);
+	
+	return;
+}
+	
+void classe_j_max(int* histo_j, int taille_histo_j, int** tableau_classe_j, int taille_tableau_classe_j, int nb_entrees_tableau_classe_j, int j_min)
+{
+	int lettre_actuelle = 0;
+	int colonne_actuelle = 0;
+	int nb_zero_de_suite = 0;
+	int trouve_autre_chose_que_zero = 0;
+	
+	for (int k=0; k < taille_histo_j; k++){
+		if (histo_j[k] != 0){
+			trouve_autre_chose_que_zero =1;
+			nb_zero_de_suite = 0;			
+		}
+		if (((trouve_autre_chose_que_zero ==1 ) && (histo_j[k] == 0 )) || (lettre_actuelle==nb_entrees_tableau_classe_j)){
+			nb_zero_de_suite = nb_zero_de_suite + 1;
+		}
+		
+		if ((nb_zero_de_suite > 9) && (trouve_autre_chose_que_zero == 1) && (lettre_actuelle<nb_entrees_tableau_classe_j)){
+			tableau_classe_j[colonne_actuelle][lettre_actuelle]=j_min+k;
+			lettre_actuelle=lettre_actuelle+1;
+			nb_zero_de_suite=0;
+			trouve_autre_chose_que_zero=0;
+		}
+		
+		if ((nb_zero_de_suite > 40)){
+			lettre_actuelle=0;
+			colonne_actuelle = colonne_actuelle + 1;
+			nb_zero_de_suite=0;
+			trouve_autre_chose_que_zero = 0;
+		}
+		
+		if (k == taille_histo_j -1){
+			tableau_classe_j[colonne_actuelle][lettre_actuelle]=j_min+k;
+		}
+	}
+	
+	FILE* fichier_classe_j = NULL;
+	fichier_classe_j = fopen("histo_abscisses_classees2.txt", "w+");
+	
+	for (int colonne_actuelle=0; colonne_actuelle<taille_tableau_classe_j ; colonne_actuelle++){
+		for (int lettre_actuelle=0;lettre_actuelle<nb_entrees_tableau_classe_j;lettre_actuelle++){
+			fprintf(fichier_classe_j,"%d\t%d\t%d\n",colonne_actuelle,lettre_actuelle,tableau_classe_j[colonne_actuelle][lettre_actuelle]);
+		}
+	}
+	
+	fclose(fichier_classe_j);
+	
+	return;
+}	
 	
 void histo_reponses(int **tableau, int taille_tableau)
 {
@@ -303,9 +516,9 @@ void histo_reponses(int **tableau, int taille_tableau)
 	}
 	
 	FILE* fichier_i = NULL;
-	fichier_i = fopen("histo_abscisses.txt", "w+");
+	fichier_i = fopen("histo_ordonnees.txt", "w+");
 	FILE* fichier_j = NULL;
-	fichier_j = fopen("histo_ordonnees.txt", "w+");
+	fichier_j = fopen("histo_abscisses.txt", "w+");
 	
 	for (int k=0; k < i_max - i_min ; k++)
 		fprintf(fichier_i,"%d\t%d\n",i_min+k,histo_i[k]);
@@ -316,6 +529,13 @@ void histo_reponses(int **tableau, int taille_tableau)
 	fclose(fichier_i);	
 	fclose(fichier_j);
 	
-}	
+}
+
+/*
+void etiquettage(int** tableau_classe_i, int*** tableau_classe_j, int* histo_i, int* histo_j, int taille_tableau_classe_i, int nb_entrees_tableau_classe_i, int taille_tableau_classe_j, int nb_entrees_1_tableau_classe_j, int nb_entrees_2_tableau_classe_j)
+{
+*/	
+
+	
 	
 	
