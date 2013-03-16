@@ -531,10 +531,102 @@ void histo_reponses(int **tableau, int taille_tableau)
 	
 }
 
-/*
-void etiquettage(int** tableau_classe_i, int*** tableau_classe_j, int* histo_i, int* histo_j, int taille_tableau_classe_i, int nb_entrees_tableau_classe_i, int taille_tableau_classe_j, int nb_entrees_1_tableau_classe_j, int nb_entrees_2_tableau_classe_j)
+char correspondance_lettre(int chiffre, char* tableau_alphabet)
 {
-*/	
+	char lettre = tableau_alphabet[chiffre % 26];
+	return lettre;
+}
+
+void etiquetage_ordonnees(int k, int** tableau_coord, int* tableau_classe_i, int *ligne_trouvee, int *no_rep, int taille_tableau_coord, int taille_tableau_classe_i)
+{
+	if (tableau_coord[k][0] < tableau_classe_i[0]){
+		*no_rep = 1;
+		*ligne_trouvee=0;
+	}
+	if (tableau_coord[k][0]> tableau_classe_i[25]){
+		*no_rep = 1;
+		*ligne_trouvee = 26;
+	}			
+		
+	for (int i=0; i<taille_tableau_classe_i-1;i++){
+		if ((tableau_coord[k][0] > tableau_classe_i[i]) && (tableau_coord[k][0] < tableau_classe_i[i+1])){
+			*ligne_trouvee = i+1;
+		}
+	}
+}
+
+void etiquetage_abscisses(int k, int** tableau_coord, int** tableau_classe_j, int *colonne_trouvee, int *lettre_trouvee, int taille_tableau_coord, int taille_tableau_classe_j, int nb_entrees_tableau_classe_j)
+{
+	if (tableau_coord[k][1] < tableau_classe_j[0][0]){
+		*colonne_trouvee=0;
+		*lettre_trouvee=0;
+	}
+	
+	if (tableau_coord[k][1] > tableau_classe_j[taille_tableau_classe_j-1][nb_entrees_tableau_classe_j-1]){
+		*colonne_trouvee = taille_tableau_classe_j-1;
+		*lettre_trouvee = nb_entrees_tableau_classe_j-1;
+	}
+	
+	for (int c=0; c<taille_tableau_classe_j; c++){ 
+		for (int l=0; l<nb_entrees_tableau_classe_j;l++){
+					
+			if ((l!=nb_entrees_tableau_classe_j-1) && (tableau_coord[k][1] > tableau_classe_j[c][l]) && (tableau_coord[k][1] < tableau_classe_j[c][l+1])){
+				*colonne_trouvee = c;
+				*lettre_trouvee = l+1;
+			}
+			
+			if ((l==nb_entrees_tableau_classe_j-1) && (c!=taille_tableau_classe_j-1) && (tableau_coord[k][1] > tableau_classe_j[c][l]) && (tableau_coord[k][1] < tableau_classe_j[c+1][0])){
+				*colonne_trouvee = c+1;
+				*lettre_trouvee = 0;
+			}
+			
+		}
+	}
+}
+
+
+void etiquetage(int** tableau_coord,int* tableau_classe_i, int** tableau_classe_j, int taille_tableau_coord, int taille_tableau_classe_i, int taille_tableau_classe_j, int nb_entrees_tableau_classe_j, char* tableau_alphabet)
+{
+	int ligne, colonne, lettre, no_rep;
+	
+	int num_question[taille_tableau_coord];
+	for (int k=0; k<taille_tableau_coord; k++)
+		num_question[k]=0;
+	int reponse[taille_tableau_coord];
+	for (int k=0; k<taille_tableau_coord; k++)
+		reponse[k]=0;
+	
+	for (int k=0; k<taille_tableau_coord; k++){
+		
+		ligne=0;
+		colonne=0;
+		lettre=0;
+		no_rep=0;
+		
+		etiquetage_ordonnees(k,tableau_coord,tableau_classe_i,&ligne,&no_rep,taille_tableau_coord,taille_tableau_classe_i);
+		
+		if (no_rep == 0) {
+			etiquetage_abscisses(k,tableau_coord,tableau_classe_j,&colonne,&lettre,taille_tableau_coord,taille_tableau_classe_j,nb_entrees_tableau_classe_j);
+		
+			num_question[k] = ligne + colonne*25;
+			reponse[k] = lettre;
+		}
+	}
+	
+	FILE* fichier_reponses = NULL;
+	fichier_reponses = fopen("reponses_qcm.txt", "w+");
+	
+	for (int k=1; k<taille_tableau_coord+1; k++){
+		if ((num_question[k-1]!=0) && (((num_question[k]==num_question[k-1]) && (reponse[k]!=reponse[k-1])) || ((num_question[k]!=num_question[k-1]) && (reponse[k]==reponse[k-1])) || ((num_question[k]!=num_question[k-1]) && (reponse[k]!=reponse[k-1])))){
+			fprintf(fichier_reponses,"%d\t%c\n",num_question[k-1],correspondance_lettre(reponse[k-1],tableau_alphabet));
+		}
+	}
+	
+	fclose(fichier_reponses);
+	
+	return;		
+		
+}
 
 	
 	
