@@ -11,37 +11,47 @@ int main(int argc, char *argv[])
 {
 	// Initialisation
 	
-	IplImage* scan;
+	IplImage* scan_vierge;
 	IplImage* scan_rep;
-	IplImage* img_glrt_scan;
-	IplImage* img_glrt_scan_rep;
-	IplImage* img_glrt;
+	IplImage* img_glrt_seuil_vierge;
+	IplImage* img_glrt_seuil_rep;
+	IplImage* img_glrt_vierge;
 	IplImage* img_glrt_rep;
 	
-	int largeur_fenetre = 11; // petite fenêtre de parcours
+	int largeur_fenetre = 11; // petite fenêtre de parcours pour glrt_1
 	int hauteur_fenetre = 18;
 	
-	int I,J;
+	int largeur_fenetre_2 = largeur_fenetre + 4; // petite fenetre de parcours pour glrt_2 (cadre de 2 pixels autour de la première)
+	int hauteur_fenetre_2 = hauteur_fenetre + 4;
 	
 	double variance_noir=8*8; // variance si on est dans le cadre
 	double variance_blanc=8*8; // variance si on est à l'intérieur du cadre
 	double variance_gris=1;//14*14;
 	double GLRT;
-	double seuil_glrt_1 = 3000;
-	double seuil_glrt_2 = -6000;//-590;//-6000;
+	double seuil_glrt_vierge = 3000;
+	double seuil_glrt_rep = -6000;//-590;
+	
+	int nb_questions = 100;
+	int nb_reponses_par_question = 5;
+	int nb_colonnes = 4;
+	int nb_classes_i = nb_questions/nb_colonnes + 2;
+	
+	int taille_tableau_coord_seuil=0;
+	int taille_tableau_coord_seuil_rep=0;
 	
 	char tableau_alphabet[26]={'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'};
 	
 	
-	// Lecture de l'image scan
+	// Lecture de l'image vierge
 	
-	scan = cvLoadImage(argv[1],CV_LOAD_IMAGE_GRAYSCALE);
-	if(!scan){
+	scan_vierge = cvLoadImage(argv[1],CV_LOAD_IMAGE_GRAYSCALE);
+	if(!scan_vierge){
 		printf("Impossible à ouvrir");
 		exit(0);
 	}
-	cvNamedWindow( "Scan", CV_WINDOW_AUTOSIZE );
-	cvShowImage( "Scan", scan );
+	cvNamedWindow( "Scan vierge", CV_WINDOW_AUTOSIZE );
+	cvShowImage( "Scan vierge", scan_vierge );
+	
 	
 	// Lecture de l'image des réponses
 	
@@ -53,65 +63,77 @@ int main(int argc, char *argv[])
 	cvNamedWindow( "Scan réponses", CV_WINDOW_AUTOSIZE );
 	cvShowImage( "Scan réponses", scan_rep );
 	
-	img_glrt_scan =cvCreateImage(cvGetSize(scan),IPL_DEPTH_8U,1);
-	
-	img_glrt_scan_rep =cvCreateImage(cvGetSize(scan_rep),IPL_DEPTH_8U,1);
-
-	img_glrt =cvCreateImage(cvSize((scan->width)-largeur_fenetre,(scan->height)-hauteur_fenetre),IPL_DEPTH_8U,1);
+	img_glrt_vierge =cvCreateImage(cvSize((scan_vierge->width)-largeur_fenetre,(scan_vierge->height)-hauteur_fenetre),IPL_DEPTH_8U,1);
 	img_glrt_rep =cvCreateImage(cvSize((scan_rep->width)-largeur_fenetre,(scan_rep->height)-hauteur_fenetre),IPL_DEPTH_8U,1);
+	img_glrt_seuil_vierge =cvCreateImage(cvGetSize(scan_vierge),IPL_DEPTH_8U,1);
+	img_glrt_seuil_rep =cvCreateImage(cvGetSize(scan_rep),IPL_DEPTH_8U,1);
 
-	
+
 	//Allocations
 	
-	double** tableau_glrt_scan = (double**)malloc(sizeof *tableau_glrt_scan * scan->height);
-	for (int k = 0; k < scan->height; k++)
-        tableau_glrt_scan[k] = (double*)malloc(sizeof **tableau_glrt_scan * scan->width);
+	int* tableau_classe_i = (int*)malloc(sizeof(int) * nb_classes_i);
+	
+	int** tableau_classe_j = (int**)malloc(sizeof *tableau_classe_j * nb_colonnes);
+	for (int k = 0; k <nb_colonnes; k++)
+        tableau_classe_j[k] = (int*)malloc(sizeof **tableau_classe_j * nb_reponses_par_question);
+	
+    int** tableau_reponses = (int**)malloc(sizeof *tableau_reponses * nb_questions);
+    for (int k=0; k < nb_questions; k++)
+		tableau_reponses[k] = (int*)malloc(sizeof **tableau_reponses * nb_reponses_par_question);
+	for (int k=0; k<nb_questions; k++){
+		for (int l=0; l<nb_reponses_par_question; l++){
+			tableau_reponses[k][l]=0;
+		}
+	}
+	
+	double** tableau_glrt_scan_vierge = (double**)malloc(sizeof *tableau_glrt_scan_vierge * scan_vierge->height);
+	for (int k = 0; k < scan_vierge->height; k++)
+        tableau_glrt_scan_vierge[k] = (double*)malloc(sizeof **tableau_glrt_scan_vierge * scan_vierge->width);
         
 	double** tableau_glrt_scan_rep = (double**)malloc(sizeof *tableau_glrt_scan_rep * scan_rep->height);
 	for (int k = 0; k < scan_rep->height; k++)
         tableau_glrt_scan_rep[k] = (double*)malloc(sizeof **tableau_glrt_scan_rep * scan_rep->width);
-        
 	
-	//Parcours de l'image scannée
 	
-	for(I=0;I<scan->height-hauteur_fenetre;I++)
+	// Calcul du GLRT sur l'image vierge (repérage des cases vides)
+	
+	for(int I=0;I<scan_vierge->height-hauteur_fenetre;I++)
 	{
-	  for(J=0;J<scan->width-largeur_fenetre;J++)
+	  for(int J=0;J<scan_vierge->width-largeur_fenetre;J++)
 		{				
-			GLRT=calcul_glrt(scan,I,J,variance_noir,variance_blanc,hauteur_fenetre,largeur_fenetre);
-			tableau_glrt_scan[I][J]=GLRT;
-			//printf("(%d,%d) : %f\n", I,J,GLRT);
+			GLRT=calcul_glrt(scan_vierge,I,J,variance_noir,variance_blanc,hauteur_fenetre,largeur_fenetre);
+			tableau_glrt_scan_vierge[I][J]=GLRT;
 		}
 	}
 	
-	image_tableau(img_glrt,tableau_glrt_scan,scan->height-hauteur_fenetre,scan->width-largeur_fenetre);
-	cvNamedWindow( "GLRT", CV_WINDOW_AUTOSIZE );
-	cvShowImage( "GLRT", img_glrt );
+	image_tableau(img_glrt_vierge,tableau_glrt_scan_vierge,scan_vierge->height-hauteur_fenetre,scan_vierge->width-largeur_fenetre);
+	cvNamedWindow( "GLRT scan vierge", CV_WINDOW_AUTOSIZE );
+	cvShowImage( "GLRT scan vierge", img_glrt_vierge );
 	
-	//cvSaveImage("Image_GLRT_version_1.pnm",img_glrt);
+	cvSaveImage("Image_GLRT_vierge.pnm",img_glrt_vierge);
 	
-	// Image GLRT seuillée scan
 	
-	int compteur=0;
+	// Image GLRT seuillée vierge
 	
-	image_seuil_glrt(img_glrt_scan,tableau_glrt_scan,seuil_glrt_1,&compteur,scan->height,scan->width,hauteur_fenetre,largeur_fenetre);
-	//printf("%d",compteur);
-	cvNamedWindow( "Seuil GLRT", CV_WINDOW_AUTOSIZE );
-	cvShowImage( "Seuil GLRT", img_glrt_scan );
+	image_seuil_glrt(img_glrt_seuil_vierge,tableau_glrt_scan_vierge,seuil_glrt_vierge,&taille_tableau_coord_seuil,scan_vierge->height-hauteur_fenetre,scan_vierge->width-largeur_fenetre);
+	cvNamedWindow( "Seuil GLRT scan vierge", CV_WINDOW_AUTOSIZE );
+	cvShowImage( "Seuil GLRT scan vierge", img_glrt_seuil_vierge );
 	
-	int** tableau_coord_seuil = (int**)malloc(sizeof *tableau_coord_seuil * compteur);
-	for (int k = 0; k <compteur; k++)
+	cvSaveImage("Image_GLRT_seuil_vierge.pnm",img_glrt_seuil_vierge);
+	
+	int** tableau_coord_seuil = (int**)malloc(sizeof *tableau_coord_seuil * taille_tableau_coord_seuil);
+	for (int k = 0; k <taille_tableau_coord_seuil; k++)
         tableau_coord_seuil[k] = (int*)malloc(sizeof **tableau_coord_seuil * 2);
         
-    tableau_coord_bin(img_glrt_scan,tableau_coord_seuil,scan->height,scan->width,hauteur_fenetre,largeur_fenetre);
+    tableau_coord_bin(img_glrt_seuil_vierge,tableau_coord_seuil,scan_vierge->height-hauteur_fenetre,scan_vierge->width-largeur_fenetre);
 	
-	// Creation des histogrammes des coordonnées et étiquetage :
 	
-	int i_min = cherche_i_min(tableau_coord_seuil,compteur);
-	int i_max = cherche_i_max(tableau_coord_seuil,compteur);
-	int j_min = cherche_j_min(tableau_coord_seuil,compteur);
-	int j_max = cherche_j_max(tableau_coord_seuil,compteur);
+	// Creation des histogrammes des coordonnées et étiquetage des cases vides :
 	
+	int i_min = cherche_i_min(tableau_coord_seuil,taille_tableau_coord_seuil);
+	int i_max = cherche_i_max(tableau_coord_seuil,taille_tableau_coord_seuil);
+	int j_min = cherche_j_min(tableau_coord_seuil,taille_tableau_coord_seuil);
+	int j_max = cherche_j_max(tableau_coord_seuil,taille_tableau_coord_seuil);
 	
 	int taille_histo_i = i_max-i_min;
 	int taille_histo_j = j_max-j_min;
@@ -123,118 +145,93 @@ int main(int argc, char *argv[])
 	for (int k=0;k<taille_histo_i;k++)
 		histo_i[k]=0;
 	
-	histo_reponses_i(tableau_coord_seuil,compteur,histo_i,taille_histo_i);
-    
-    int* tableau_classe_i = (int*)malloc(sizeof(int) * 27);
+	histo_reponses_i(tableau_coord_seuil,taille_tableau_coord_seuil,histo_i,taille_histo_i);
+	classe_i_max(histo_i, taille_histo_i, tableau_classe_i,nb_classes_i,i_min);
         
-    classe_i_max(histo_i, taille_histo_i, tableau_classe_i,27,i_min);
-    
-    printf("\n%d,%d\n",tableau_coord_seuil[0][0],tableau_coord_seuil[0][1]);
-    
-    histo_reponses_j(tableau_coord_seuil,compteur,histo_j,taille_histo_j,tableau_classe_i[0],tableau_classe_i[25]);
-    
-    int** tableau_classe_j = (int**)malloc(sizeof *tableau_classe_j * 4);
-	for (int k = 0; k <4; k++)
-        tableau_classe_j[k] = (int*)malloc(sizeof **tableau_classe_j * 5);
-        
-    classe_j_max(histo_j,taille_histo_j,tableau_classe_j,4,5,j_min);
+    histo_reponses_j(tableau_coord_seuil,taille_tableau_coord_seuil,histo_j,taille_histo_j,tableau_classe_i[0],tableau_classe_i[25]);
+    classe_j_max(histo_j,taille_histo_j,tableau_classe_j,nb_colonnes,nb_reponses_par_question,j_min);
+		
 	
+	// Calcul du GLRT sur les cases de l'image des réponses (repérage des cases pleines) :
 	
-	//cvSaveImage("Image_GLRT_scan_version_1.pnm",img_glrt_scan);
-	
-	
-	//Parcours de l'image des réponses
-	
-	for(I=0;I<scan_rep->height-hauteur_fenetre-4;I++)
-	{
-		for(J=0;J<scan_rep->width-largeur_fenetre-4;J++)
-		{
-			tableau_glrt_scan_rep[I][J]=-920000;
+	for(int I=0; I < scan_rep->height-hauteur_fenetre_2 ; I++){
+		for(int J=0; J < scan_rep->width-largeur_fenetre_2 ; J++){
 			
-			for(int k=0;k<compteur;k++){
+			tableau_glrt_scan_rep[I][J]=-1060000;
+			
+			for(int k=0;k<taille_tableau_coord_seuil;k++){
 				if (tableau_coord_seuil[k][0]==I && tableau_coord_seuil[k][1]==J){
-					GLRT=calcul_glrt_2(scan_rep,I-2,J-2,variance_noir,variance_blanc,variance_gris,hauteur_fenetre+4,largeur_fenetre+4);
+					GLRT=calcul_glrt_2(scan_rep,I-2,J-2,variance_noir,variance_blanc,variance_gris,hauteur_fenetre_2,largeur_fenetre_2);
 					tableau_glrt_scan_rep[I][J]=GLRT;
-					//printf("(%d,%d) : %f\n", I,J,tableau_glrt_scan_rep[I][J]);
 				}
 			}
 		}
 	}
 	
-	ecriture_fichier_histogramme(tableau_glrt_scan_rep,scan_rep->height,scan_rep->width,hauteur_fenetre+4,largeur_fenetre+4,1000);
+	ecriture_fichier_histogramme(tableau_glrt_scan_rep,scan_rep->height-hauteur_fenetre_2,scan_rep->width-largeur_fenetre_2,1000);
 	
-	image_tableau(img_glrt_rep,tableau_glrt_scan_rep,scan_rep->height-(hauteur_fenetre+4),scan_rep->width-(largeur_fenetre+4));
-	cvNamedWindow( "GLRT rep", CV_WINDOW_AUTOSIZE );
-	cvShowImage( "GLRT rep", img_glrt_rep );
+	image_tableau(img_glrt_rep,tableau_glrt_scan_rep,scan_rep->height-hauteur_fenetre_2,scan_rep->width-largeur_fenetre_2);
+	cvNamedWindow( "GLRT scan rep", CV_WINDOW_AUTOSIZE );
+	cvShowImage( "GLRT sacn rep", img_glrt_rep );
 	
-	//Histogramme
-	//ecriture_fichier_histogramme(tableau_glrt_scan,scan->height,scan->width,hauteur_fenetre,largeur_fenetre,25);
+	cvSaveImage("Image_GLRT_rep.pnm",img_glrt_rep);
 	
 	
-	// Image GLRT seuillée scan des réponses
+	// Image GLRT seuillée des réponses
+		
+	image_seuil_glrt(img_glrt_seuil_rep,tableau_glrt_scan_rep,seuil_glrt_rep,&taille_tableau_coord_seuil_rep,scan_rep->height-hauteur_fenetre_2,scan_rep->width-largeur_fenetre_2);
+	cvNamedWindow( "Seuil GLRT scan rep", CV_WINDOW_AUTOSIZE );
+	cvShowImage( "Seuil GLRT scan rep", img_glrt_seuil_rep );
 	
-	int compteur2=0;
-	image_seuil_glrt(img_glrt_scan_rep,tableau_glrt_scan_rep,seuil_glrt_2,&compteur2,scan_rep->height,scan_rep->width,hauteur_fenetre+4,largeur_fenetre+4);
-	cvNamedWindow( "Seuil GLRT réponses", CV_WINDOW_AUTOSIZE );
-	cvShowImage( "Seuil GLRT réponses", img_glrt_scan_rep );
+	cvSaveImage("Image_GLRT_seuil_rep.pnm",img_glrt_seuil_rep);
 	
-	int** tableau_coord_seuil_rep = (int**)malloc(sizeof *tableau_coord_seuil_rep * compteur);
-	for (int k = 0; k <compteur2; k++)
+	
+	// Etiquetage des réponses
+	
+	int** tableau_coord_seuil_rep = (int**)malloc(sizeof *tableau_coord_seuil_rep * taille_tableau_coord_seuil_rep);
+	for (int k = 0; k <taille_tableau_coord_seuil_rep; k++)
         tableau_coord_seuil_rep[k] = (int*)malloc(sizeof **tableau_coord_seuil_rep * 2);
 	
-	tableau_coord_bin(img_glrt_scan_rep,tableau_coord_seuil_rep,scan_rep->height,scan_rep->width,hauteur_fenetre+4,largeur_fenetre+4);
-	for (int k=0; k<compteur2 ; k++){
-		printf("(%d,%d)\n",tableau_coord_seuil_rep[k][0],tableau_coord_seuil_rep[k][1]);
-	}
+	tableau_coord_bin(img_glrt_seuil_rep,tableau_coord_seuil_rep,scan_rep->height-hauteur_fenetre_2,scan_rep->width-largeur_fenetre_2);
 	
-	etiquetage(tableau_coord_seuil_rep,tableau_classe_i,tableau_classe_j,compteur2,27,4,5,tableau_alphabet);
+	etiquetage(tableau_coord_seuil_rep,tableau_classe_i,tableau_classe_j,tableau_reponses,taille_tableau_coord_seuil_rep,nb_classes_i,nb_colonnes,nb_reponses_par_question,nb_questions,nb_reponses_par_question,tableau_alphabet);
 	
-		
-	//cvSaveImage("Image_GLRT_seuil_rep_tout.pnm",img_glrt_scan_rep);
-
 	
 	//Libération
-    for(int k = 0; k < scan->height; k++)
-	{
-        free(tableau_glrt_scan[k]);
-	}
-	free(tableau_glrt_scan);
-	
-	for(int k = 0; k < scan_rep->height; k++)
-	{
-        free(tableau_glrt_scan_rep[k]);
-	}
-	free(tableau_glrt_scan_rep);
-	
-	for(int k = 0; k < compteur; k++)
-	{
-        free(tableau_coord_seuil[k]);
-	}
-	free(tableau_coord_seuil);
-	
-	for(int k = 0; k < compteur2; k++)
-	{
-        free(tableau_coord_seuil_rep[k]);
-	}
-	free(tableau_coord_seuil_rep);
-	
-	
-	for(int k = 0; k < 4; k++)
-	{
-        free(tableau_classe_j[k]);
-	}
-	free(tableau_classe_j);
-	
 	
 	free(tableau_classe_i);
+	
+    for(int k = 0; k < nb_colonnes; k++)
+        free(tableau_classe_j[k]);
+	free(tableau_classe_j);
+
+	for(int k = 0; k < nb_questions; k++)
+        free(tableau_reponses[k]);
+	free(tableau_reponses);
+    
+    for(int k = 0; k < scan_vierge->height; k++)
+        free(tableau_glrt_scan_vierge[k]);
+	free(tableau_glrt_scan_vierge);
+	
+	for(int k = 0; k < scan_rep->height; k++)
+        free(tableau_glrt_scan_rep[k]);
+	free(tableau_glrt_scan_rep);
+	
+	for(int k = 0; k < taille_tableau_coord_seuil; k++)
+        free(tableau_coord_seuil[k]);
+	free(tableau_coord_seuil);
+	
+	for(int k = 0; k < taille_tableau_coord_seuil_rep; k++)
+        free(tableau_coord_seuil_rep[k]);
+	free(tableau_coord_seuil_rep);
 	
 	free(histo_i);
 	free(histo_j);
 	
-	cvReleaseImage(&img_glrt_scan);
-	cvReleaseImage(&img_glrt);
-	cvReleaseImage(&scan);
-	cvReleaseImage(&img_glrt_scan_rep);
+	cvReleaseImage(&img_glrt_seuil_vierge);
+	cvReleaseImage(&img_glrt_vierge);
+	cvReleaseImage(&scan_vierge);
+	cvReleaseImage(&img_glrt_seuil_rep);
 	cvReleaseImage(&scan_rep);
 	cvWaitKey(0);
 	

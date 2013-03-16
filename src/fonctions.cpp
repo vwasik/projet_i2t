@@ -8,15 +8,12 @@ double cherche_min(double ** tableau, int taille_tableau, int nb_entrees)
 {
 	double min = tableau[0][0];
 	int I,J;
-	for(I=0;I<taille_tableau;I++)
-        {
-          for(J=0;J<nb_entrees;J++)
-            {
-				if (tableau[I][J] < min){
-					min = tableau[I][J];
-				}
-			}
+	for(I=0; I<taille_tableau; I++){
+		for(J=0; J<nb_entrees; J++){
+			if (tableau[I][J] < min)
+				min = tableau[I][J];
 		}
+	}
 	
 	return min;
 }
@@ -25,50 +22,46 @@ double cherche_max(double ** tableau, int taille_tableau, int nb_entrees)
 {
 	double max = tableau[0][0];
 	int I,J;
-	for(I=0;I<taille_tableau;I++)
-        {
-          for(J=0;J<nb_entrees;J++)
-            {
-				if (tableau[I][J] > max){
-					max = tableau[I][J];
-				}
-			}
+	for(I=0; I<taille_tableau; I++){
+		for(J=0; J<nb_entrees; J++){
+			if (tableau[I][J] > max)
+				max = tableau[I][J];
 		}
+	}
 	
 	return max;
 }
 
-void image_seuil_glrt(IplImage* img_glrt, double** tableau, double seuil, int *compteur, int hauteur_img, int largeur_img, int hauteur_fen, int largeur_fen)
+void image_seuil_glrt(IplImage* img_glrt, double** tableau, double seuil, int *compteur, int taille_tableau, int nb_entrees_tableau)
 {
 	int I,J;
-	for(I=0;I<hauteur_img-hauteur_fen;I++)
-        {
-          for(J=0;J<largeur_img-largeur_fen;J++)
-            {
-				CvScalar pix_glrt = cvGet2D(img_glrt,I,J);
+	for(I=0; I<taille_tableau; I++){
+		for(J=0;J<nb_entrees_tableau;J++){
+			
+			CvScalar pix_glrt = cvGet2D(img_glrt,I,J);
 				
-				if (tableau[I][J] > seuil){
-					pix_glrt.val[0]=0;
-					cvSet2D(img_glrt,I,J,pix_glrt);
-					*compteur = *compteur +1;
-				}
-				else{
-					pix_glrt.val[0]=255;
-					cvSet2D(img_glrt,I,J,pix_glrt);
-				}
+			if (tableau[I][J] > seuil){
+				pix_glrt.val[0]=0;
+				cvSet2D(img_glrt,I,J,pix_glrt);
+				*compteur = *compteur +1;
+			}
+			else{
+				pix_glrt.val[0]=255;
+				cvSet2D(img_glrt,I,J,pix_glrt);
 			}
 		}
-		
+	}
+	
+	return;	
 }
 
-void tableau_coord_bin(IplImage* img_bin, int **tableau, int hauteur_img, int largeur_img, int hauteur_fen, int largeur_fen)
+void tableau_coord_bin(IplImage* img_bin, int** tableau, int taille_tableau, int nb_entrees_tableau)
 {
 	int I,J;
 	int ind_tab=0;
-	for(I=0;I<hauteur_img-hauteur_fen;I++)
-    {
-		for(J=0;J<largeur_img-largeur_fen;J++)
-        {
+	for(I=0; I<taille_tableau; I++){
+		for(J=0; J<nb_entrees_tableau; J++){
+			
 			CvScalar pix_glrt = cvGet2D(img_bin,I,J);
 				
 			if (pix_glrt.val[0]==0){
@@ -78,20 +71,19 @@ void tableau_coord_bin(IplImage* img_bin, int **tableau, int hauteur_img, int la
 			}
 		}
 	}
+	return;
 }
 
-void image_tableau(IplImage* img_glrt,double** tableau, int taille_tableau, int nb_entrees)
+void image_tableau(IplImage* img_glrt,double** tableau, int taille_tableau, int nb_entrees_tableau)
 {
 	int I,J;
-	double min = cherche_min(tableau, taille_tableau, nb_entrees);
-	printf("%f\n",min);
-	double max = cherche_max(tableau, taille_tableau, nb_entrees);
-	printf("%f\n",max);
+	double min = cherche_min(tableau, taille_tableau, nb_entrees_tableau);
+	double max = cherche_max(tableau, taille_tableau, nb_entrees_tableau);
 	double coeff = 255.0/(max-min);
 	
 	for(I=0;I<taille_tableau;I++)
     {
-		for(J=0;J<nb_entrees;J++)
+		for(J=0;J<nb_entrees_tableau;J++)
         {
 			CvScalar pix_glrt = cvGet2D(img_glrt,I,J);
 			pix_glrt.val[0] = (unsigned char)(coeff*(tableau[I][J]-min));
@@ -101,21 +93,24 @@ void image_tableau(IplImage* img_glrt,double** tableau, int taille_tableau, int 
 	return;
 }
 
-double calcul_glrt(IplImage* src, int I, int J, double variance_noir,double variance_blanc, int hauteur_fenetre, int largeur_fenetre)
+double calcul_glrt(IplImage* src, int I, int J, double variance_noir, double variance_blanc, int hauteur_fenetre, int largeur_fenetre)
 {
 	int i,j;
-	double somme_1 =0;
+	double somme_1=0;
 	double somme_2=0;
 	double moyenne_1, moyenne_2, moyenne_3;
 	double GLRT;
-	int ind_1 =0;
+	int ind_1=0;
 	int ind_2=0;
 	double S_1=0;
 	double S_2=0;
 	double S_3=0;
 	
-	double tableau_1[largeur_fenetre*2+hauteur_fenetre*2-4];
-	double tableau_2[(largeur_fenetre-2)*(hauteur_fenetre-2)];
+	int taille_cadre=largeur_fenetre*2+hauteur_fenetre*2-4;
+	int taille_int_cadre=(largeur_fenetre-2)*(hauteur_fenetre-2);
+	
+	double tableau_1[taille_cadre];
+	double tableau_2[taille_int_cadre];
 	
 	for(i=0;i<hauteur_fenetre;i++){
 		for(j=0;j<largeur_fenetre;j++){
@@ -136,19 +131,19 @@ double calcul_glrt(IplImage* src, int I, int J, double variance_noir,double vari
 	}
 				
 	//Calcul des moyennes
-	moyenne_1=somme_1/(largeur_fenetre*2+hauteur_fenetre*2-4);
-	moyenne_2=somme_2/((largeur_fenetre-2)*(hauteur_fenetre-2));
+	moyenne_1=somme_1/taille_cadre;
+	moyenne_2=somme_2/taille_int_cadre;
 	moyenne_3=(somme_1+somme_2)/(largeur_fenetre*hauteur_fenetre);
 	
-	for(int k=0; k<largeur_fenetre*2+hauteur_fenetre*2-4; k++)
+	for(int k=0; k<taille_cadre; k++)
 		S_1=S_1+(tableau_1[k]-moyenne_1)*(tableau_1[k]-moyenne_1);
 		
-	for(int k=0; k<(largeur_fenetre-2)*(hauteur_fenetre-2); k++)
+	for(int k=0; k<taille_int_cadre; k++)
 		S_2=S_2+(tableau_2[k]-moyenne_2)*(tableau_2[k]-moyenne_2);
 		
-	for(int k=0; k<largeur_fenetre*2+hauteur_fenetre*2-4; k++)
+	for(int k=0; k<taille_cadre; k++)
 		S_3=S_3+(tableau_1[k]-moyenne_3)*(tableau_1[k]-moyenne_3);
-	for(int k=0; k<(largeur_fenetre-2)*(hauteur_fenetre-2); k++)
+	for(int k=0; k<taille_int_cadre; k++)
 		S_3=S_3+(tableau_2[k]-moyenne_3)*(tableau_2[k]-moyenne_3);
 	
 	//Calcul de rapport de vraisemblance :
@@ -161,7 +156,6 @@ double calcul_glrt(IplImage* src, int I, int J, double variance_noir,double vari
 double calcul_glrt_2(IplImage* src, int I, int J, double variance_blanc,double variance_noir, double variance_gris, int hauteur_fenetre, int largeur_fenetre)
 {
 	
-	// TODO : modifier la taille de la fenêtre : 1 pixel de cadre extérieur au lieu de 2 ??
 	int i,j;
 	double somme_1 =0;
 	double somme_2=0;
@@ -235,27 +229,24 @@ double calcul_glrt_2(IplImage* src, int I, int J, double variance_blanc,double v
 	return GLRT;
 }
 
-void ecriture_fichier_histogramme(double ** tableau, int hauteur_img, int largeur_img, int hauteur_fenetre, int largeur_fenetre, int nb_bins)
+void ecriture_fichier_histogramme(double** tableau, int taille_tableau, int nb_entrees_tableau, int nb_bins)
 {
 	FILE* fichier = NULL;
 	fichier = fopen("histo_rep.txt", "w+");
 	
-	if (fichier != NULL)
-    {
-		double min = cherche_min(tableau, hauteur_img-hauteur_fenetre, largeur_img-largeur_fenetre);
-		double max = cherche_max(tableau, hauteur_img-hauteur_fenetre, largeur_img-largeur_fenetre);
+	if (fichier != NULL){
+		double min = cherche_min(tableau, taille_tableau, nb_entrees_tableau);
+		double max = cherche_max(tableau, taille_tableau, nb_entrees_tableau);
 		
 		double pas = (max-min)/nb_bins;
 		
 		int I,J,k;
-		for(k=0;k<nb_bins;k++)
-		{
+		for(k=0;k<nb_bins;k++){
+			
 			int valeur = 0;
 			
-			for(I=0;I<hauteur_img-hauteur_fenetre;I++)
-			{
-				for(J=0;J<largeur_img-largeur_fenetre;J++)
-				{
+			for(I=0; I<taille_tableau; I++){
+				for(J=0; J<nb_entrees_tableau; J++){
 					if (tableau[I][J]>min+k*pas && tableau[I][J]<min+(k+1)*pas)
 						valeur = valeur + 1;
 				}
@@ -269,49 +260,51 @@ void ecriture_fichier_histogramme(double ** tableau, int hauteur_img, int largeu
     {
         printf("Impossible d'ouvrir le fichier");
     }
+    
+    return;
 }
 
-int cherche_i_min(int** tableau_coordonnees, int taille_tableau)
+int cherche_i_min(int** tableau_coord, int taille_tableau)
 {
-	int i_min = tableau_coordonnees[0][0];
+	int i_min = tableau_coord[0][0];
 	
 	for(int k=0;k<taille_tableau;k++){
-		if (tableau_coordonnees[k][0] < i_min)
-			i_min = tableau_coordonnees[k][0];
+		if (tableau_coord[k][0] < i_min)
+			i_min = tableau_coord[k][0];
 	}
 	
 	return i_min;
 }
 
-int cherche_i_max(int** tableau_coordonnees, int taille_tableau)
+int cherche_i_max(int** tableau_coord, int taille_tableau)
 {
 	int i_max = 0;
 	for(int k=0;k<taille_tableau;k++){
-		if (tableau_coordonnees[k][0] > i_max)
-			i_max = tableau_coordonnees[k][0];
+		if (tableau_coord[k][0] > i_max)
+			i_max = tableau_coord[k][0];
 	}
 	
 	return i_max;
 }	
 
-int cherche_j_min(int** tableau_coordonnees, int taille_tableau)
+int cherche_j_min(int** tableau_coord, int taille_tableau)
 {
-	int j_min = tableau_coordonnees[0][1];
+	int j_min = tableau_coord[0][1];
 	
 	for(int k=0;k<taille_tableau;k++){
-		if (tableau_coordonnees[k][1] < j_min)
-			j_min = tableau_coordonnees[k][1];
+		if (tableau_coord[k][1] < j_min)
+			j_min = tableau_coord[k][1];
 	}
 	
 	return j_min;
 }
 
-int cherche_j_max(int** tableau_coordonnees, int taille_tableau)
+int cherche_j_max(int** tableau_coord, int taille_tableau)
 {
 	int j_max = 0;
 	for(int k=0;k<taille_tableau;k++){
-		if (tableau_coordonnees[k][1] > j_max)
-			j_max = tableau_coordonnees[k][1];
+		if (tableau_coord[k][1] > j_max)
+			j_max = tableau_coord[k][1];
 	}
 	
 	return j_max;
@@ -321,18 +314,23 @@ void histo_reponses_i(int** tableau, int taille_tableau, int* histo_i, int taill
 {
 	int i_min = cherche_i_min(tableau,taille_tableau);
 	
-	for (int k = 0 ; k < taille_tableau ; k++){
-		int indice_i = tableau[k][0] - i_min;
+	for (int k=0; k<taille_tableau; k++){
+		int indice_i = tableau[k][0]-i_min;
 		histo_i[indice_i] += 1;
 	}
 	
 	FILE* fichier_i = NULL;
 	fichier_i = fopen("histo_ordonnees.txt", "w+");
 	
-	for (int k=0; k < taille_histo_i ; k++)
-		fprintf(fichier_i,"%d\t%d\n",i_min+k,histo_i[k]);
-	
-	fclose(fichier_i);
+	if (fichier_i != NULL){
+		for (int k=0; k < taille_histo_i ; k++)
+			fprintf(fichier_i,"%d\t%d\n",i_min+k,histo_i[k]);
+		
+		fclose(fichier_i);
+	}
+	else{
+        printf("Impossible d'ouvrir le fichier");
+    }
 	
 	return;
 }
@@ -349,53 +347,20 @@ void histo_reponses_j(int** tableau, int taille_tableau, int* histo_j, int taill
 	}
 	
 	FILE* fichier_j = NULL;
-	fichier_j = fopen("histo_abscisses2.txt", "w+");
+	fichier_j = fopen("histo_abscisses.txt", "w+");
 	
-	for (int k=0; k < taille_histo_j ; k++)
-		fprintf(fichier_j,"%d\t%d\n",j_min+k,histo_j[k]);
-	
-	fclose(fichier_j);
+	if (fichier_j != NULL){
+		for (int k=0; k < taille_histo_j ; k++)
+			fprintf(fichier_j,"%d\t%d\n",j_min+k,histo_j[k]);
+		
+		fclose(fichier_j);
+	}
+	else{
+        printf("Impossible d'ouvrir le fichier");
+    }
 	
 	return;
 }
-/*
-void classe_i(int* histo_i, int taille_histo_i, int** tableau_classe_i, int taille_tableau_classe_i, int nb_entrees_tableau_classe_i, int i_min)
-{
-	int a =0;
-	int ind = 0;
-	
-	for(int k=0; k<taille_histo_i-4; k++){
-		if (histo_i[k]!=0){
-			tableau_classe_i[a][ind]=k+i_min;
-			ind=ind+1;
-		}
-		if ((histo_i[k]!=0) && (histo_i[k+1]==0) && (histo_i[k+2]==0) && (histo_i[k+3]==0)){
-			a=a+1;
-			ind=0;
-		}
-	}
-	
-	for (int k=taille_histo_i-5;k<taille_histo_i;k++){
-		if (histo_i[k]!=0){
-			tableau_classe_i[a][ind]=k+i_min;
-			ind=ind+1;
-		}
-	}
-	
-	FILE* fichier_classe_i = NULL;
-	fichier_classe_i = fopen("histo_ordonnees_classees.txt", "w+");
-	
-	for (int a=0; a<taille_tableau_classe_i ; a++){
-		for (int ind=0; ind<nb_entrees_tableau_classe_i;ind++){
-			fprintf(fichier_classe_i,"%d\t%d\n",a,tableau_classe_i[a][ind]);
-		}
-	}
-	
-	fclose(fichier_classe_i); 
-	
-	return;
-}
-* */
 
 void classe_i_max(int* histo_i, int taille_histo_i, int* tableau_classe_i, int taille_tableau_classe_i, int i_min)
 {
@@ -408,30 +373,35 @@ void classe_i_max(int* histo_i, int taille_histo_i, int* tableau_classe_i, int t
 			trouve_autre_chose_que_zero =1;
 			nb_zero_de_suite = 0;			
 		}
-		if ((trouve_autre_chose_que_zero ==1 ) && (histo_i[k] == 0 )){
+		if ((trouve_autre_chose_que_zero==1) && (histo_i[k]==0)){
 			nb_zero_de_suite = nb_zero_de_suite + 1;
 		}
 		
-		if ((nb_zero_de_suite > 2) && (trouve_autre_chose_que_zero == 1)){
+		if ((nb_zero_de_suite>2) && (trouve_autre_chose_que_zero==1)){
 			tableau_classe_i[classe_actuelle]=i_min+k;
 			classe_actuelle=classe_actuelle+1;
 			nb_zero_de_suite=0;
 			trouve_autre_chose_que_zero = 0;
 		}
-		if (k == taille_histo_i -1){
+		if (k==taille_histo_i -1){
 			tableau_classe_i[classe_actuelle]=i_min+k;
 		}
 	}
 	
 	FILE* fichier_classe_i = NULL;
-	fichier_classe_i = fopen("histo_ordonnees_classees2.txt", "w+");
+	fichier_classe_i = fopen("histo_ordonnees_classees.txt", "w+");
 	
-	for (int classe_actuelle=0; classe_actuelle<taille_tableau_classe_i ; classe_actuelle++){
-		fprintf(fichier_classe_i,"%d\t%d\n",classe_actuelle,tableau_classe_i[classe_actuelle]);
+	if (fichier_classe_i!=NULL){
+		for (int classe_actuelle=0; classe_actuelle<taille_tableau_classe_i ; classe_actuelle++){
+			fprintf(fichier_classe_i,"%d\t%d\n",classe_actuelle,tableau_classe_i[classe_actuelle]);
+		}
+	
+		fclose(fichier_classe_i);
 	}
-	
-	fclose(fichier_classe_i);
-	
+	else{
+        printf("Impossible d'ouvrir le fichier");
+    }
+    
 	return;
 }
 	
@@ -471,64 +441,23 @@ void classe_j_max(int* histo_j, int taille_histo_j, int** tableau_classe_j, int 
 	}
 	
 	FILE* fichier_classe_j = NULL;
-	fichier_classe_j = fopen("histo_abscisses_classees2.txt", "w+");
+	fichier_classe_j = fopen("histo_abscisses_classees.txt", "w+");
 	
-	for (int colonne_actuelle=0; colonne_actuelle<taille_tableau_classe_j ; colonne_actuelle++){
-		for (int lettre_actuelle=0;lettre_actuelle<nb_entrees_tableau_classe_j;lettre_actuelle++){
-			fprintf(fichier_classe_j,"%d\t%d\t%d\n",colonne_actuelle,lettre_actuelle,tableau_classe_j[colonne_actuelle][lettre_actuelle]);
+	if (fichier_classe_j != NULL){
+	
+		for (int colonne_actuelle=0; colonne_actuelle<taille_tableau_classe_j ; colonne_actuelle++){
+			for (int lettre_actuelle=0;lettre_actuelle<nb_entrees_tableau_classe_j;lettre_actuelle++){
+				fprintf(fichier_classe_j,"%d\t%d\t%d\n",colonne_actuelle,lettre_actuelle,tableau_classe_j[colonne_actuelle][lettre_actuelle]);
+			}
 		}
+		
+		fclose(fichier_classe_j);
 	}
-	
-	fclose(fichier_classe_j);
+	else{
+        printf("Impossible d'ouvrir le fichier");
+    }
 	
 	return;
-}	
-	
-void histo_reponses(int **tableau, int taille_tableau)
-{
-	int i_min = tableau[0][0];
-	int i_max = 0;
-	int j_min = tableau[0][1] ;
-	int j_max = 0;
-	for(int k=0;k<taille_tableau;k++){
-		if (tableau[k][0] > i_max)
-			i_max = tableau[k][0];
-		if (tableau[k][0] < i_min)
-			i_min = tableau[k][0];
-		if (tableau[k][1] > j_max)
-			j_max = tableau[k][1];
-		if (tableau[k][1] < j_min)
-			j_min = tableau[k][1];
-	}
-	
-	int histo_i[(i_max - i_min)];
-	int histo_j[(j_max - j_min)];
-	for (int k = 0; k < i_max - i_min ;k++)
-		histo_i[k]=0;
-	for (int k = 0; k < j_max - j_min ;k++)
-		histo_j[k]=0;
-	
-	for (int k = 0 ; k < taille_tableau ; k++){
-		int indice_i = tableau[k][0] - i_min;
-		histo_i[indice_i] += 1;
-		int indice_j = tableau[k][1] - j_min;
-		histo_j[indice_j] += 1;
-	}
-	
-	FILE* fichier_i = NULL;
-	fichier_i = fopen("histo_ordonnees.txt", "w+");
-	FILE* fichier_j = NULL;
-	fichier_j = fopen("histo_abscisses.txt", "w+");
-	
-	for (int k=0; k < i_max - i_min ; k++)
-		fprintf(fichier_i,"%d\t%d\n",i_min+k,histo_i[k]);
-	for (int k=0; k < j_max - j_min ; k++)
-		fprintf(fichier_j,"%d\t%d\n",j_min+k,histo_j[k]);
-	
-	
-	fclose(fichier_i);	
-	fclose(fichier_j);
-	
 }
 
 char correspondance_lettre(int chiffre, char* tableau_alphabet)
@@ -553,6 +482,8 @@ void etiquetage_ordonnees(int k, int** tableau_coord, int* tableau_classe_i, int
 			*ligne_trouvee = i+1;
 		}
 	}
+	
+	return;
 }
 
 void etiquetage_abscisses(int k, int** tableau_coord, int** tableau_classe_j, int *colonne_trouvee, int *lettre_trouvee, int taille_tableau_coord, int taille_tableau_classe_j, int nb_entrees_tableau_classe_j)
@@ -579,23 +510,18 @@ void etiquetage_abscisses(int k, int** tableau_coord, int** tableau_classe_j, in
 				*colonne_trouvee = c+1;
 				*lettre_trouvee = 0;
 			}
-			
 		}
 	}
+	
+	return;
 }
 
 
-void etiquetage(int** tableau_coord,int* tableau_classe_i, int** tableau_classe_j, int taille_tableau_coord, int taille_tableau_classe_i, int taille_tableau_classe_j, int nb_entrees_tableau_classe_j, char* tableau_alphabet)
+void etiquetage(int** tableau_coord, int* tableau_classe_i, int** tableau_classe_j, int** tableau_reponses, int taille_tableau_coord, int taille_tableau_classe_i, int taille_tableau_classe_j, int nb_entrees_tableau_classe_j, int taille_tableau_reponses, int nb_entrees_tableau_reponses, char* tableau_alphabet)
 {
 	int ligne, colonne, lettre, no_rep;
-	
-	int num_question[taille_tableau_coord];
-	for (int k=0; k<taille_tableau_coord; k++)
-		num_question[k]=0;
-	int reponse[taille_tableau_coord];
-	for (int k=0; k<taille_tableau_coord; k++)
-		reponse[k]=0;
-	
+	int num_question,reponse;
+		
 	for (int k=0; k<taille_tableau_coord; k++){
 		
 		ligne=0;
@@ -608,24 +534,33 @@ void etiquetage(int** tableau_coord,int* tableau_classe_i, int** tableau_classe_
 		if (no_rep == 0) {
 			etiquetage_abscisses(k,tableau_coord,tableau_classe_j,&colonne,&lettre,taille_tableau_coord,taille_tableau_classe_j,nb_entrees_tableau_classe_j);
 		
-			num_question[k] = ligne + colonne*25;
-			reponse[k] = lettre;
+			num_question = ligne + colonne*25;
+			reponse = lettre;
+			
+			tableau_reponses[num_question-1][reponse]=1;
 		}
 	}
-	
+		
 	FILE* fichier_reponses = NULL;
 	fichier_reponses = fopen("reponses_qcm.txt", "w+");
 	
-	for (int k=1; k<taille_tableau_coord+1; k++){
-		if ((num_question[k-1]!=0) && (((num_question[k]==num_question[k-1]) && (reponse[k]!=reponse[k-1])) || ((num_question[k]!=num_question[k-1]) && (reponse[k]==reponse[k-1])) || ((num_question[k]!=num_question[k-1]) && (reponse[k]!=reponse[k-1])))){
-			fprintf(fichier_reponses,"%d\t%c\n",num_question[k-1],correspondance_lettre(reponse[k-1],tableau_alphabet));
-		}
+	if (fichier_reponses != NULL){
+		
+		for (int k=0; k < taille_tableau_reponses; k++){
+			for (int l=0; l < nb_entrees_tableau_reponses; l++){
+				if (l == 0 % nb_entrees_tableau_reponses)
+					fprintf(fichier_reponses,"\n");
+				if (tableau_reponses[k][l]==1)
+					fprintf(fichier_reponses,"%d\t%c\n",k+1,correspondance_lettre(l,tableau_alphabet));
+			}
+		}		
+		fclose(fichier_reponses);
 	}
-	
-	fclose(fichier_reponses);
+	else{
+        printf("Impossible d'ouvrir le fichier");
+    }
 	
 	return;		
-		
 }
 
 	
