@@ -71,6 +71,7 @@ void tableau_coord_bin(IplImage* img_bin, int** tableau, int taille_tableau, int
 			}
 		}
 	}
+	
 	return;
 }
 
@@ -90,30 +91,30 @@ void image_tableau(IplImage* img_glrt,double** tableau, int taille_tableau, int 
 			cvSet2D(img_glrt,I,J,pix_glrt);
 		}
 	}
+	
 	return;
 }
 
-double calcul_glrt(IplImage* src, int I, int J, double variance_noir, double variance_blanc, int hauteur_fenetre, int largeur_fenetre)
+double calcul_glrt_pixel(IplImage* src, int I, int J, double variance_blanc, double variance_noir, int hauteur_fenetre, int largeur_fenetre)
 {
-	int i,j;
-	double somme_1=0;
-	double somme_2=0;
-	double moyenne_1, moyenne_2, moyenne_3;
-	double GLRT;
-	int ind_1=0;
-	int ind_2=0;
-	double S_1=0;
-	double S_2=0;
-	double S_3=0;
+	double somme_1=0, somme_2=0;
+	double moyenne_1=0, moyenne_2=0, moyenne_3=0;
+	double GLRT=0;
+	int ind_1=0,ind_2=0;
+	double S_1=0, S_2=0, S_3=0;;
 	
 	int taille_cadre=largeur_fenetre*2+hauteur_fenetre*2-4;
 	int taille_int_cadre=(largeur_fenetre-2)*(hauteur_fenetre-2);
 	
 	double tableau_1[taille_cadre];
 	double tableau_2[taille_int_cadre];
+	for (int k=0; k<taille_cadre; k++)
+		tableau_1[k]=0;
+	for (int k=0; k<taille_int_cadre; k++)
+		tableau_2[k]=0;
 	
-	for(i=0;i<hauteur_fenetre;i++){
-		for(j=0;j<largeur_fenetre;j++){
+	for(int i=0;i<hauteur_fenetre;i++){
+		for(int j=0;j<largeur_fenetre;j++){
 						
 			CvScalar scal = cvGet2D(src,I+i,J+j);
 			
@@ -147,28 +148,19 @@ double calcul_glrt(IplImage* src, int I, int J, double variance_noir, double var
 		S_3=S_3+(tableau_2[k]-moyenne_3)*(tableau_2[k]-moyenne_3);
 	
 	//Calcul de rapport de vraisemblance :
-	
 	GLRT = -(S_1/variance_noir) - (S_2/variance_blanc) + (S_3/variance_blanc);
 	
 	return GLRT;
 }
 
-double calcul_glrt_2(IplImage* src, int I, int J, double variance_blanc,double variance_noir, double variance_gris, int hauteur_fenetre, int largeur_fenetre)
+double calcul_glrt_2_pixel(IplImage* src, int I, int J, double variance_blanc,double variance_noir, double variance_gris, int hauteur_fenetre, int largeur_fenetre)
 {
-	
-	int i,j;
-	double somme_1 =0;
-	double somme_2=0;
-	double somme_3=0;
-	double moyenne_1, moyenne_2,moyenne_4,moyenne_3;
-	double GLRT;
-	int ind_1 =0;
-	int ind_2=0;
-	int ind_3=0;
-	double S_1=0;
-	double S_2=0;
-	double S_3=0;
-	double S_4=0;
+
+	double somme_1 =0, somme_2=0, somme_3=0;
+	double moyenne_1=0, moyenne_2=0,moyenne_4=0,moyenne_3=0;
+	double GLRT=0;
+	int ind_1=0, ind_2=0, ind_3=0;
+	double S_1=0, S_2=0, S_3=0, S_4=0;
 	
 	int taille_bord=largeur_fenetre*hauteur_fenetre-(largeur_fenetre-4)*(hauteur_fenetre-4);
 	int taille_cadre=(largeur_fenetre-4)*2+(hauteur_fenetre-4)*2-4;
@@ -177,10 +169,16 @@ double calcul_glrt_2(IplImage* src, int I, int J, double variance_blanc,double v
 	double tableau_1[taille_cadre];
 	double tableau_2[taille_bord];
 	double tableau_3[taille_int_cadre];
+	for (int k=0; k<taille_cadre; k++)
+		tableau_1[k]=0;
+	for (int k=0; k<taille_bord; k++)
+		tableau_2[k]=0;
+	for (int k=0; k<taille_int_cadre; k++)
+		tableau_3[k]=0;
 	
-	for(i=0;i<hauteur_fenetre;i++){
-		for(j=0;j<largeur_fenetre;j++){
-						
+	for(int i=0;i<hauteur_fenetre;i++){
+		for(int j=0;j<largeur_fenetre;j++){
+			
 			CvScalar scal = cvGet2D(src,I+i,J+j);
 		
 			if((i==2 && 1<j && j<largeur_fenetre-2) || (i==hauteur_fenetre-3 && 1<j && j<largeur_fenetre-2) || (j==largeur_fenetre-3 && 1<i && i<hauteur_fenetre-2) || (j==2 && 1<i && i<hauteur_fenetre-2)){
@@ -223,10 +221,45 @@ double calcul_glrt_2(IplImage* src, int I, int J, double variance_blanc,double v
 		S_4=S_4+(tableau_3[k]-moyenne_4)*(tableau_3[k]-moyenne_4);
 	
 	//Calcul de rapport de vraisemblance :
-	
 	GLRT = -(-(S_4/variance_blanc) + (S_2/variance_blanc) + (S_3/variance_gris));
 	
 	return GLRT;
+}
+
+void calcul_glrt_1_image(IplImage* src, double** tableau_GLRT, double variance_blanc,double variance_noir, int hauteur_fenetre, int largeur_fenetre, int hauteur_image, int largeur_image)
+{
+	double GLRT=0;
+	
+	for(int I=0;I<hauteur_image-hauteur_fenetre;I++)
+	{
+	  for(int J=0;J<largeur_image-largeur_fenetre;J++)
+		{				
+			GLRT=calcul_glrt_pixel(src,I,J,variance_noir,variance_blanc,hauteur_fenetre,largeur_fenetre);
+			tableau_GLRT[I][J]=GLRT;
+		}
+	}
+	
+	return;
+}
+
+void calcul_glrt_2_image(IplImage* src, double** tableau_GLRT, int** tableau_coord_seuil, int taille_tableau_coord_seuil, double variance_blanc,double variance_noir, double variance_gris, int hauteur_fenetre, int largeur_fenetre, int hauteur_image, int largeur_image)
+{
+	double GLRT=0;
+	
+	for(int I=0;I<hauteur_image-hauteur_fenetre;I++){
+	  for(int J=0;J<largeur_image-largeur_fenetre;J++){
+		  
+			for(int k=0;k<taille_tableau_coord_seuil;k++){
+				if (tableau_coord_seuil[k][0]==I && tableau_coord_seuil[k][1]==J){
+						
+					GLRT=calcul_glrt_2_pixel(src,I-2,J-2,variance_blanc,variance_noir,variance_gris,hauteur_fenetre,largeur_fenetre);
+					tableau_GLRT[I][J]=GLRT;
+				}
+			}
+		}
+	}
+	
+	return;
 }
 
 void ecriture_fichier_histogramme(double** tableau, int taille_tableau, int nb_entrees_tableau, int nb_bins)
@@ -417,7 +450,7 @@ void classe_j_max(int* histo_j, int taille_histo_j, int** tableau_classe_j, int 
 			trouve_autre_chose_que_zero =1;
 			nb_zero_de_suite = 0;			
 		}
-		if (((trouve_autre_chose_que_zero ==1 ) && (histo_j[k] == 0 )) || (lettre_actuelle==nb_entrees_tableau_classe_j)){
+		if (((trouve_autre_chose_que_zero ==1) && (histo_j[k] == 0)) || (lettre_actuelle==nb_entrees_tableau_classe_j)){
 			nb_zero_de_suite = nb_zero_de_suite + 1;
 		}
 		
@@ -477,8 +510,9 @@ void etiquetage_ordonnees(int k, int** tableau_coord, int* tableau_classe_i, int
 		*ligne_trouvee = 26;
 	}			
 		
-	for (int i=0; i<taille_tableau_classe_i-1;i++){
+	for (int i=0; i<taille_tableau_classe_i-2;i++){
 		if ((tableau_coord[k][0] > tableau_classe_i[i]) && (tableau_coord[k][0] < tableau_classe_i[i+1])){
+			*no_rep = 0;
 			*ligne_trouvee = i+1;
 		}
 	}
@@ -512,48 +546,47 @@ void etiquetage_abscisses(int k, int** tableau_coord, int** tableau_classe_j, in
 			}
 		}
 	}
+
+	return;
+}
+
+void etiquetage_pixel(int indice,int** tableau_coord, int* tableau_classe_i, int** tableau_classe_j, char* tableau_reponses, int taille_tableau_coord, int taille_tableau_classe_i, int taille_tableau_classe_j, int nb_entrees_tableau_classe_j, int taille_tableau_reponses, char* tableau_alphabet)
+{
+	int ligne, colonne, lettre, no_rep;
+	int num_question;
+	char reponse;
+				
+	etiquetage_ordonnees(indice,tableau_coord,tableau_classe_i,&ligne,&no_rep,taille_tableau_coord,taille_tableau_classe_i);
+	
+	if (no_rep == 0){
+		
+		etiquetage_abscisses(indice,tableau_coord,tableau_classe_j,&colonne,&lettre,taille_tableau_coord,taille_tableau_classe_j,nb_entrees_tableau_classe_j);
+	
+		num_question = ligne + colonne*(taille_tableau_reponses/taille_tableau_classe_j);
+		reponse = correspondance_lettre(lettre,tableau_alphabet);
+		
+		if ((tableau_reponses[num_question-1] == '0') || (tableau_reponses[num_question-1] == reponse)){
+			tableau_reponses[num_question-1]=reponse;			
+		}
+		else{
+			tableau_reponses[num_question-1]='1';
+		}
+	}
 	
 	return;
 }
 
-
-void etiquetage(int** tableau_coord, int* tableau_classe_i, int** tableau_classe_j, int** tableau_reponses, int taille_tableau_coord, int taille_tableau_classe_i, int taille_tableau_classe_j, int nb_entrees_tableau_classe_j, int taille_tableau_reponses, int nb_entrees_tableau_reponses, char* tableau_alphabet)
+void ecriture_etiquetage(char* tableau_reponses, int taille_tableau_reponses)
 {
-	int ligne, colonne, lettre, no_rep;
-	int num_question,reponse;
-		
-	for (int k=0; k<taille_tableau_coord; k++){
-		
-		ligne=0;
-		colonne=0;
-		lettre=0;
-		no_rep=0;
-		
-		etiquetage_ordonnees(k,tableau_coord,tableau_classe_i,&ligne,&no_rep,taille_tableau_coord,taille_tableau_classe_i);
-		
-		if (no_rep == 0) {
-			etiquetage_abscisses(k,tableau_coord,tableau_classe_j,&colonne,&lettre,taille_tableau_coord,taille_tableau_classe_j,nb_entrees_tableau_classe_j);
-		
-			num_question = ligne + colonne*25;
-			reponse = lettre;
-			
-			tableau_reponses[num_question-1][reponse]=1;
-		}
-	}
-		
 	FILE* fichier_reponses = NULL;
-	fichier_reponses = fopen("reponses_qcm.txt", "w+");
+	fichier_reponses = fopen("reponses_qcm2.txt", "w+");
 	
 	if (fichier_reponses != NULL){
 		
-		for (int k=0; k < taille_tableau_reponses; k++){
-			for (int l=0; l < nb_entrees_tableau_reponses; l++){
-				if (l == 0 % nb_entrees_tableau_reponses)
-					fprintf(fichier_reponses,"\n");
-				if (tableau_reponses[k][l]==1)
-					fprintf(fichier_reponses,"%d\t%c\n",k+1,correspondance_lettre(l,tableau_alphabet));
-			}
-		}		
+		for (int k=0; k<taille_tableau_reponses;k++){
+			fprintf(fichier_reponses,"%d\t%c\n",k+1,tableau_reponses[k]);
+		}
+			
 		fclose(fichier_reponses);
 	}
 	else{
@@ -563,6 +596,67 @@ void etiquetage(int** tableau_coord, int* tableau_classe_i, int** tableau_classe
 	return;		
 }
 
+void comparaison_reponses(char* tableau_reponses, char* tableau_reponses_vraies, int taille_tableau, int *score)
+{
+	*score=0;
 	
+	FILE* fichier_correction = NULL;
+	fichier_correction = fopen("reponses_qcm_corrige.txt", "w+");
+	
+	if (fichier_correction != NULL){
+	
+		for (int k=0; k<taille_tableau; k++){
+			if (tableau_reponses[k]=='0')
+				fprintf(fichier_correction,"Question %d\tPas de réponse\n",k+1);
+			if (tableau_reponses[k]=='1')
+				fprintf(fichier_correction,"Question %d\tNul\n",k+1);
+			if (tableau_reponses[k]==tableau_reponses_vraies[k]){
+				fprintf(fichier_correction,"Question %d\tBonne réponse ! (%c)\n",k+1,tableau_reponses_vraies[k]);
+				*score=*score+1;
+			}
+			if ((tableau_reponses[k]!=tableau_reponses_vraies[k]) && (tableau_reponses[k]!='0') && (tableau_reponses[k]!='1'))
+				fprintf(fichier_correction,"Question %d\tFAUX (bonne réponse : %c)\n",k+1,tableau_reponses_vraies[k]);
+		}
+				
+		fprintf(fichier_correction,"\nSCORE : %d/%d",*score,taille_tableau);
+	
+	fclose(fichier_correction);
+	}
+	else{
+        printf("Impossible d'ouvrir le fichier");
+    }
+	
+	return;		
+}
+			
+void lecture_fichier_reponses_vraies(char* tableau_reponses_vraies, int taille_tableau_reponses_vraies)
+{	
+	int c;
+	FILE* fichier_reponses_vraies=NULL;
+	fichier_reponses_vraies = fopen("test_reponses.txt","r");
+	
+	if (fichier_reponses_vraies!=NULL){
+		
+		for (int k=0; k<taille_tableau_reponses_vraies; k++){
+			
+			c=getc(fichier_reponses_vraies);
+			while (c=='\n'){
+				c=getc(fichier_reponses_vraies);
+			}
+			tableau_reponses_vraies[k]=c;
+		}
+		
+	fclose(fichier_reponses_vraies);
+		
+	}
+	else{
+        printf("Impossible d'ouvrir le fichier");
+    }		
+	
+	return;
+}
+
+	
+		
 	
 	

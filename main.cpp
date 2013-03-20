@@ -26,10 +26,10 @@ int main(int argc, char *argv[])
 	
 	double variance_noir=8*8; // variance si on est dans le cadre
 	double variance_blanc=8*8; // variance si on est à l'intérieur du cadre
-	double variance_gris=1;//14*14;
-	double GLRT;
+	double variance_gris= 1 ;//14*14;
 	double seuil_glrt_vierge = 3000;
 	double seuil_glrt_rep = -6000;//-590;
+	double init_glrt_rep= -1060000;
 	
 	int nb_questions = 100;
 	int nb_reponses_par_question = 5;
@@ -41,6 +41,10 @@ int main(int argc, char *argv[])
 	
 	char tableau_alphabet[26]={'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'};
 	
+	char tableau_reponses_vraies[nb_questions];
+	lecture_fichier_reponses_vraies(tableau_reponses_vraies,nb_questions);
+	
+	int score;
 	
 	// Lecture de l'image vierge
 	
@@ -76,15 +80,10 @@ int main(int argc, char *argv[])
 	int** tableau_classe_j = (int**)malloc(sizeof *tableau_classe_j * nb_colonnes);
 	for (int k = 0; k <nb_colonnes; k++)
         tableau_classe_j[k] = (int*)malloc(sizeof **tableau_classe_j * nb_reponses_par_question);
-	
-    int** tableau_reponses = (int**)malloc(sizeof *tableau_reponses * nb_questions);
-    for (int k=0; k < nb_questions; k++)
-		tableau_reponses[k] = (int*)malloc(sizeof **tableau_reponses * nb_reponses_par_question);
-	for (int k=0; k<nb_questions; k++){
-		for (int l=0; l<nb_reponses_par_question; l++){
-			tableau_reponses[k][l]=0;
-		}
-	}
+
+	char* tableau_reponses = (char*)malloc(sizeof *tableau_reponses * nb_questions);
+	for (int k=0; k<nb_questions; k++)
+		tableau_reponses[k]='0';
 	
 	double** tableau_glrt_scan_vierge = (double**)malloc(sizeof *tableau_glrt_scan_vierge * scan_vierge->height);
 	for (int k = 0; k < scan_vierge->height; k++)
@@ -93,18 +92,18 @@ int main(int argc, char *argv[])
 	double** tableau_glrt_scan_rep = (double**)malloc(sizeof *tableau_glrt_scan_rep * scan_rep->height);
 	for (int k = 0; k < scan_rep->height; k++)
         tableau_glrt_scan_rep[k] = (double*)malloc(sizeof **tableau_glrt_scan_rep * scan_rep->width);
+    
+    for (int k=0; k<scan_rep->height; k++){
+		for (int l=0; l<scan_rep->width; l++){
+			tableau_glrt_scan_rep[k][l]=init_glrt_rep;
+		}
+	}
+	
 	
 	
 	// Calcul du GLRT sur l'image vierge (repérage des cases vides)
 	
-	for(int I=0;I<scan_vierge->height-hauteur_fenetre;I++)
-	{
-	  for(int J=0;J<scan_vierge->width-largeur_fenetre;J++)
-		{				
-			GLRT=calcul_glrt(scan_vierge,I,J,variance_noir,variance_blanc,hauteur_fenetre,largeur_fenetre);
-			tableau_glrt_scan_vierge[I][J]=GLRT;
-		}
-	}
+	calcul_glrt_1_image(scan_vierge,tableau_glrt_scan_vierge,variance_blanc,variance_noir,hauteur_fenetre,largeur_fenetre,scan_vierge->height,scan_vierge->width);
 	
 	image_tableau(img_glrt_vierge,tableau_glrt_scan_vierge,scan_vierge->height-hauteur_fenetre,scan_vierge->width-largeur_fenetre);
 	cvNamedWindow( "GLRT scan vierge", CV_WINDOW_AUTOSIZE );
@@ -153,26 +152,14 @@ int main(int argc, char *argv[])
 		
 	
 	// Calcul du GLRT sur les cases de l'image des réponses (repérage des cases pleines) :
-	
-	for(int I=0; I < scan_rep->height-hauteur_fenetre_2 ; I++){
-		for(int J=0; J < scan_rep->width-largeur_fenetre_2 ; J++){
-			
-			tableau_glrt_scan_rep[I][J]=-1060000;
-			
-			for(int k=0;k<taille_tableau_coord_seuil;k++){
-				if (tableau_coord_seuil[k][0]==I && tableau_coord_seuil[k][1]==J){
-					GLRT=calcul_glrt_2(scan_rep,I-2,J-2,variance_noir,variance_blanc,variance_gris,hauteur_fenetre_2,largeur_fenetre_2);
-					tableau_glrt_scan_rep[I][J]=GLRT;
-				}
-			}
-		}
-	}
+		
+	calcul_glrt_2_image(scan_rep,tableau_glrt_scan_rep,tableau_coord_seuil,taille_tableau_coord_seuil,variance_blanc,variance_noir,variance_gris,hauteur_fenetre_2,largeur_fenetre_2, scan_rep->height, scan_rep->width);
 	
 	ecriture_fichier_histogramme(tableau_glrt_scan_rep,scan_rep->height-hauteur_fenetre_2,scan_rep->width-largeur_fenetre_2,1000);
 	
 	image_tableau(img_glrt_rep,tableau_glrt_scan_rep,scan_rep->height-hauteur_fenetre_2,scan_rep->width-largeur_fenetre_2);
 	cvNamedWindow( "GLRT scan rep", CV_WINDOW_AUTOSIZE );
-	cvShowImage( "GLRT sacn rep", img_glrt_rep );
+	cvShowImage( "GLRT scan rep", img_glrt_rep );
 	
 	cvSaveImage("Image_GLRT_rep.pnm",img_glrt_rep);
 	
@@ -194,7 +181,14 @@ int main(int argc, char *argv[])
 	
 	tableau_coord_bin(img_glrt_seuil_rep,tableau_coord_seuil_rep,scan_rep->height-hauteur_fenetre_2,scan_rep->width-largeur_fenetre_2);
 	
-	etiquetage(tableau_coord_seuil_rep,tableau_classe_i,tableau_classe_j,tableau_reponses,taille_tableau_coord_seuil_rep,nb_classes_i,nb_colonnes,nb_reponses_par_question,nb_questions,nb_reponses_par_question,tableau_alphabet);
+	for (int k=0; k<taille_tableau_coord_seuil_rep; k++)
+			etiquetage_pixel(k,tableau_coord_seuil_rep,tableau_classe_i,tableau_classe_j,tableau_reponses,taille_tableau_coord_seuil_rep,nb_classes_i,nb_colonnes,nb_reponses_par_question,nb_questions,tableau_alphabet);
+		
+	
+	ecriture_etiquetage(tableau_reponses,nb_questions);
+	
+	comparaison_reponses(tableau_reponses,tableau_reponses_vraies,nb_questions,&score);
+	printf("Score : %d/%d\n",score,nb_questions);
 	
 	
 	//Libération
@@ -204,10 +198,8 @@ int main(int argc, char *argv[])
     for(int k = 0; k < nb_colonnes; k++)
         free(tableau_classe_j[k]);
 	free(tableau_classe_j);
-
-	for(int k = 0; k < nb_questions; k++)
-        free(tableau_reponses[k]);
-	free(tableau_reponses);
+    
+    free(tableau_reponses);
     
     for(int k = 0; k < scan_vierge->height; k++)
         free(tableau_glrt_scan_vierge[k]);
